@@ -1,0 +1,9 @@
+[project]
+name = "dedup-pg"
+version = "0.1.0"
+description = "Postgres indexing utilities to implement high-throughput queries with on-the-fly deduplication"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.3.4",
+]
