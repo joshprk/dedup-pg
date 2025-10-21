@@ -1,7 +1,7 @@
 from collections import defaultdict
 
-from src.dedup_pg import DedupIndex
-from src.dedup_pg.helpers import n_grams
+from dedup_pg import DedupIndex
+from dedup_pg.helpers import n_grams
 
 # A corpus of named items we want to deduplicate
 corpus = [
