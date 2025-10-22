@@ -1,9 +1,5 @@
 # dedup-pg
 
-> [!NOTE]
-> The hashing scheme is subject to change since it still needs to be optimized. This message will be removed when
-> this is done.
-
 A library with functions useful for implementing a MinHash-based deduplication indexing layer in Postgres, or any
 relational database.
 
