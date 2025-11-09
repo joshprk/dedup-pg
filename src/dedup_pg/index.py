@@ -13,11 +13,11 @@ class DedupIndex:
         rows: int = 5,
     ) -> None:
         """
-        Indexing layer that allows for query-time deduplication through hashing
+        Indexing layer that allows for query-time deduplication through hashing.
 
         Args:
-            num_perms (int): The number of permutation functions to use to generate item signatures
-            rows (int): The number of rows to use when making signature bands
+            num_perms (int): The number of permutation functions to use to generate item signatures.
+            rows (int): The number of rows to use when making signature bands.
         """
         self.num_hashes = num_perms
         self.rows = rows
@@ -27,14 +27,14 @@ class DedupIndex:
 
     def _token_hash(self, token: str, seeds: np.ndarray) -> np.ndarray:
         """
-        Hash computation for all seeds per token
+        Hash computation for all seeds per token.
 
         Args:
-            token (str): The token to hash
-            seeds (list[int]): The array of integer seeds to use for each hash row
+            token (str): The token to hash.
+            seeds (list[int]): The array of integer seeds to use for each hash row.
 
         Returns:
-            list[int]: An array of integer has hash values, one per seed
+            list[int]: An array of integer has hash values, one per seed.
         """
         return np.array([
             int(hashlib.blake2b(f"{token}-{seed}".encode(), digest_size=8).hexdigest(), 16)
@@ -43,13 +43,13 @@ class DedupIndex:
 
     def _minhash_signature(self, tokens: Iterable[str]) -> list[int]:
         """
-        Optimized MinHash calculation using numpy vectorization
+        Optimized MinHash calculation using numpy vectorization.
 
         Args:
-            tokens (Iterable[str]): A list of tokens to compute the MinHash signature of
+            tokens (Iterable[str]): A list of tokens to compute the MinHash signature of.
 
         Returns:
-            list[int]: A MinHash signature consisting of `num_rows` hashes
+            list[int]: A MinHash signature consisting of `num_rows` hashes.
         """
         tokens = list(tokens)
         seeds = np.arange(self.num_hashes)
@@ -68,10 +68,10 @@ class DedupIndex:
 
         Args:
             tokens (Iterable[str]): An iterable of any byte-encodeable objects which represent the content to
-                deduplicate
+                deduplicate.
 
         Returns:
-            list[str]: LSH bands derived from the MinHash signature of the tokens
+            list[str]: LSH bands derived from the MinHash signature of the tokens.
         """
         signature = self._minhash_signature(tokens)
         band_hashes: list[str] = []
@@ -101,9 +101,28 @@ class DedupIndex:
 
     def index(self, items: Iterable[tuple[int, str]]) -> UUID:
         """
-        Retrieves the cluster UUID4 of a given items list derived from MinHash bands
+        Retrieves the cluster UUID4 of a given items list derived from MinHash bands. This may add a new entry to the
+        backend if the bands do not exist.
 
         Args:
-            items (Iterable[str]): A list of item tuples. See `DedupIndex.items` for details
+            items (Iterable[str]): A list of item tuples. See `DedupIndex.items` for details.
+
+        Returns:
+            UUID: The cluster ID of the given MinHash bands.
         """
         return self._backend.insert(items)
+
+    def query(self, tokens: Iterable[str]) -> UUID:
+        """
+        Retrieves the cluster UUID4 of the given tokens. This may add a new entry to the backend if the bands do not
+        exist.
+
+        Args:
+            tokens (Iterable[str]): A list of tokens derived from some function such as the n_grams function.
+
+        Returns:
+            UUID: The cluster ID of the given tokens.
+        """
+        bands = self.bands(tokens)
+        items = self.items(bands)
+        return self.index(items)
