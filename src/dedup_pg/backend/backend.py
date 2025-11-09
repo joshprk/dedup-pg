@@ -15,6 +15,9 @@ class Backend(ABC):
 
 class LocalBackend(Backend):
     def __init__(self) -> None:
+        """
+        A local backend as an example of how to implement the Backend class.
+        """
         self._index: dict[tuple[int, str], UUID] = {}
 
     def insert(self, bands: Iterable[tuple[int, str]]) -> UUID:

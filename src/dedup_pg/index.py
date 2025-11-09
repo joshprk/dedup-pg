@@ -3,12 +3,13 @@ import numpy as np
 from collections.abc import Iterable
 from uuid import UUID
 
-from .backend import LocalBackend
+from .backend import Backend, LocalBackend
 
 
 class DedupIndex:
     def __init__(
         self,
+        backend: Backend | None = None,
         num_perms: int = 128,
         rows: int = 5,
     ) -> None:
@@ -23,7 +24,7 @@ class DedupIndex:
         self.rows = rows
         self.num_bands = num_perms // rows
 
-        self._backend = LocalBackend()
+        self._backend = LocalBackend() if backend is None else backend
 
     def _token_hash(self, token: str, seeds: np.ndarray) -> np.ndarray:
         """

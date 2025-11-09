@@ -1,6 +1,8 @@
 from collections.abc import Iterator
 import time
+
 import docker
+import pytest
 
 PGVECTOR_IMAGE_NAME = "pgvector/pgvector:pg18-trixie"
 
@@ -23,17 +25,28 @@ def postgres_server() -> Iterator[dict[str, str]]:
         ports={"5432/tcp": None},
         detach=True,
         remove=True,
-        healthcheck={
-            "test": ["CMD-SHELL", "pg_isready -U postgres"],
-            "interval": 1000000000,
-            "timeout": 3000000000,
-            "retries": 5,
-        },
     )
+
+    host_port = None
+
+    for _ in range(20):
+        container.reload()
+        ports = container.attrs.get("NetworkSettings", {}).get("Ports", {})
+        if ports and ports.get("5432/tcp"):
+            host_port = ports["5432/tcp"][0]["HostPort"]
+            break
+
+        time.sleep(0.5)
+
+    # TODO: Use proper health checks to prevent early disconnection
+    time.sleep(10.0)
+
+    if host_port is None:
+        raise RuntimeError("Postgres container timed out")
 
     yield {
         "host": "localhost",
-        "port": str(5432),
+        "port": host_port,
         "database": "testdb",
         "user": "postgres",
         "password": "postgres",
