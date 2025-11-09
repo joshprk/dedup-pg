@@ -95,10 +95,9 @@ wheels = [
 
 [[package]]
 name = "dedup-pg"
-version = "0.1.0"
+version = "0.2.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "docker" },
     { name = "numpy" },
     { name = "pytest" },
 ]
@@ -109,15 +108,22 @@ sqlalchemy = [
     { name = "sqlalchemy" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "docker" },
+]
+
 [package.metadata]
 requires-dist = [
-    { name = "docker", specifier = ">=7.1.0" },
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "psycopg2-binary", marker = "extra == 'sqlalchemy'", specifier = ">=2.9.11" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "sqlalchemy", marker = "extra == 'sqlalchemy'", specifier = ">=2.0.44" },
 ]
 provides-extras = ["sqlalchemy"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "docker", specifier = ">=7.1.0" }]
 
 [[package]]
 name = "docker"

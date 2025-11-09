@@ -1,11 +1,10 @@
 [project]
 name = "dedup-pg"
-version = "0.1.0"
+version = "0.2.0"
 description = "Postgres indexing utilities to implement high-throughput queries with on-the-fly deduplication"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "docker>=7.1.0",
     "numpy>=2.3.4",
     "pytest>=8.4.2",
 ]
@@ -14,4 +13,9 @@ dependencies = [
 sqlalchemy = [
     "psycopg2-binary>=2.9.11",
     "sqlalchemy>=2.0.44",
+]
+
+[dependency-groups]
+dev = [
+    "docker>=7.1.0",
 ]
