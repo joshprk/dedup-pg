@@ -1,8 +1,8 @@
 from collections.abc import Iterator
+import time
 import docker
-import pytest
 
-PGVECTOR_IMAGE_NAME = "pgvector/pgvector:latest"
+PGVECTOR_IMAGE_NAME = "pgvector/pgvector:pg18-trixie"
 
 
 @pytest.fixture(scope="session")
@@ -23,13 +23,17 @@ def postgres_server() -> Iterator[dict[str, str]]:
         ports={"5432/tcp": None},
         detach=True,
         remove=True,
+        healthcheck={
+            "test": ["CMD-SHELL", "pg_isready -U postgres"],
+            "interval": 1000000000,
+            "timeout": 3000000000,
+            "retries": 5,
+        },
     )
-
-    host_port = container.attrs["NetworkSettings"]["Ports"]["5432/tcp"][0]["HostPort"]
 
     yield {
         "host": "localhost",
-        "port": host_port,
+        "port": str(5432),
         "database": "testdb",
         "user": "postgres",
         "password": "postgres",
