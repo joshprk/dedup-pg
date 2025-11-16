@@ -84,7 +84,13 @@ class SQLAlchemyBackend(Backend):
         )
 
         with self._session_factory() as session:
-            session.execute(text("SET LOCAL synchronous_commit = OFF"))
+            # Commit returns before WAL is flushed to durable storage.
+            # The transaction is visible immediately, but a crash before a WAL flush may
+            # forget some committed transactions.
+            #
+            # This is a good-tradeoff as it saves nearly 5 ms of commit time for a high-volume
+            # transaction in exchange for long-tail errors.
+            _ = session.execute(text("SET LOCAL synchronous_commit = OFF"))
 
             existing_uuid = session.execute(check_existing_stmt).scalars().first()
             cluster_uuid = existing_uuid or uuid4()
