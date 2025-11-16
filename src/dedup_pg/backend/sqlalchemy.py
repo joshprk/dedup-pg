@@ -11,6 +11,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     select,
+    text,
     tuple_
 )
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -83,6 +84,8 @@ class SQLAlchemyBackend(Backend):
         )
 
         with self._session_factory() as session:
+            session.execute(text("SET LOCAL synchronous_commit = OFF"))
+
             existing_uuid = session.execute(check_existing_stmt).scalars().first()
             cluster_uuid = existing_uuid or uuid4()
 
