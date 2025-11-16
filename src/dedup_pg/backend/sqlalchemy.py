@@ -2,7 +2,6 @@ from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    BigInteger,
     Column,
     Engine,
     MetaData,
@@ -70,6 +69,12 @@ class SQLAlchemyBackend(Backend):
             )
         )
 
+        # Precompile PostgreSQL insert stmt
+        self._insert_sql = (
+            pg_insert(self._table)
+            .on_conflict_do_nothing(index_elements=["band_idx", "band_hash"])
+        )
+
     def insert(self, bands: Iterable[tuple[int, str]]) -> UUID:
         check_existing_stmt = (
             select(self._table.c.cluster_uuid)
@@ -82,15 +87,12 @@ class SQLAlchemyBackend(Backend):
             cluster_uuid = existing_uuid or uuid4()
 
             # NOTE: Only works on Postgres.
-            stmt = (
-                pg_insert(self._table).values([
-                    {"band_idx": i, "band_hash": h, "cluster_uuid": cluster_uuid}
-                    for i, h in bands
-                ])
-                .on_conflict_do_nothing(index_elements=["band_idx", "band_hash"])
-            )
+            values = [
+                {"band_idx": i, "band_hash": h, "cluster_uuid": str(cluster_uuid)}
+                for i, h in bands
+            ]
 
-            _ = session.execute(stmt)
+            _ = session.execute(self._insert_sql, values)
             session.commit()
 
         return cluster_uuid
