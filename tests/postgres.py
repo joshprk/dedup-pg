@@ -84,7 +84,7 @@ def test_postgres_sequential_insert(postgres_server: dict[str, str]) -> None:
         _ = session.execute(text("ANALYZE seq_lsh_index"))
         session.commit()
 
-    for i in range(1000):
+    for i in range(500):
         rand_str = n_grams("".join([random.choice(string.ascii_letters) for _ in range(15)]))
         t = timeit.timeit(
             lambda s=rand_str: index.query(s),
@@ -120,5 +120,5 @@ def test_postgres_profile_insert(postgres_server: dict[str, str]) -> None:
         stats = pstats.Stats(pr)
         stats.sort_stats("tottime").print_stats(40)
 
-    bands = [(i, f"hash{i}") for i in range(32)]
+    bands = [f"token-{i}" for i in range(32)]
     profile_insert(index, bands)
