@@ -1,9 +1,13 @@
-import hashlib
+import struct
 import numpy as np
+import xxhash
 from collections.abc import Iterable
 from uuid import UUID
 
 from .backend import Backend, LocalBackend
+
+MAX64 = np.uint64((1 << 64) - 1)
+MIX_CONST = np.uint64(0x9e3779b97f4a7c15)
 
 
 class DedupIndex:
@@ -26,23 +30,7 @@ class DedupIndex:
 
         self._backend = LocalBackend() if backend is None else backend
 
-    def _token_hash(self, token: str, seeds: np.ndarray) -> np.ndarray:
-        """
-        Hash computation for all seeds per token.
-
-        Args:
-            token (str): The token to hash.
-            seeds (list[int]): The array of integer seeds to use for each hash row.
-
-        Returns:
-            list[int]: An array of integer has hash values, one per seed.
-        """
-        return np.array([
-            int(hashlib.blake2b(f"{token}-{seed}".encode(), digest_size=8).hexdigest(), 16)
-            for seed in seeds
-        ])
-
-    def _minhash_signature(self, tokens: Iterable[str]) -> list[int]:
+    def _minhash_signature(self, tokens: Iterable[str]) -> np.ndarray:
         """
         Optimized MinHash calculation using numpy vectorization.
 
@@ -53,14 +41,17 @@ class DedupIndex:
             list[int]: A MinHash signature consisting of `num_rows` hashes.
         """
         tokens = list(tokens)
-        seeds = np.arange(self.num_hashes)
-        min_hashes = np.full(self.num_hashes, np.inf)
+
+        seeds = np.arange(self.num_hashes, dtype=np.uint64)
+        perm = seeds * np.uint64(0x9e3779b97f4a7c15)
+        min_hashes = np.full(self.num_hashes, np.uint64(0xFFFFFFFFFFFFFFFF), dtype=np.uint64)
 
         for token in tokens:
-            token_hashes = self._token_hash(token, seeds)
+            h0 = np.uint64(xxhash.xxh3_64(token).intdigest())
+            token_hashes = h0 ^ perm
             min_hashes = np.minimum(min_hashes, token_hashes)
 
-        return min_hashes.astype(int).tolist()
+        return min_hashes
 
     def bands(self, tokens: Iterable[str]) -> list[str]:
         """
@@ -79,8 +70,8 @@ class DedupIndex:
 
         for i in range(0, len(signature), self.rows):
             band = signature[i:i + self.rows]
-            band_str = '|'.join(map(str, band))
-            band_hash = hashlib.blake2b(band_str.encode(), digest_size=8).hexdigest()
+            payload = struct.pack(f"{len(band)}Q", *band)
+            band_hash = xxhash.xxh64(payload).hexdigest()
 
             band_hashes.append(band_hash)
 
