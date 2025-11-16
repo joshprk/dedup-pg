@@ -122,3 +122,49 @@ def test_postgres_profile_insert(postgres_server: dict[str, str]) -> None:
 
     bands = [f"token-{i}" for i in range(32)]
     profile_insert(index, bands)
+
+
+def test_postgres_explain_insert(postgres_server: dict[str, str]) -> None:
+    database_url = _fmt_database_url(postgres_server)
+    engine = create_engine(database_url)
+    SessionLocal = sessionmaker(engine)
+
+    backend = SQLAlchemyBackend(
+        engine=engine,
+        base_or_metadata=Base,
+        table_name="explain_lsh_index",
+    )
+
+    index = DedupIndex(backend)
+
+    Base.metadata.create_all(engine)
+
+    # Generate a representative band set
+    tokens = [f"token-{i}" for i in range(32)]
+    bands = index.bands(tokens)
+    items = index.items(bands)
+
+    # Build the exact INSERT statement that backend.insert(items) will execute.
+    # We reconstruct it so we can EXPLAIN it directly.
+    values_clause = ", ".join(
+        f"({band_index}, '{band_hash}', gen_random_uuid())"
+        for band_index, band_hash in items
+    )
+
+    explain_sql = f"""
+        EXPLAIN (ANALYZE, BUFFERS)
+        INSERT INTO explain_lsh_index (band_idx, band_hash, cluster_uuid)
+        VALUES {values_clause};
+    """
+
+    with SessionLocal() as session:
+        result = session.execute(text(explain_sql))
+        plan_lines = [row[0] for row in result.fetchall()]
+
+    # Basic correctness check
+    assert any("Insert on explain_lsh_index" in line for line in plan_lines)
+
+    print("\nEXPLAIN ANALYZE output:")
+    for line in plan_lines:
+        print(line)
+
