@@ -57,10 +57,9 @@ class SQLAlchemyBackend(Backend):
         self._table = Table(
             table_name,
             self._metadata,
-            Column("id", BigInteger, primary_key=True, autoincrement=True),
             Column("band_idx", SmallInteger, nullable=False),
             Column("band_hash", String, nullable=False),
-            Column("cluster_uuid", Uuid, default=uuid4, nullable=False, index=True),
+            Column("cluster_uuid", Uuid, nullable=False),
         )
 
         self._table.append_constraint(
@@ -72,29 +71,26 @@ class SQLAlchemyBackend(Backend):
         )
 
     def insert(self, bands: Iterable[tuple[int, str]]) -> UUID:
-        check_existing_stmt = select(self._table.c.cluster_uuid).where(
-            tuple_(self._table.c.band_idx, self._table.c.band_hash).in_(bands)
-        ).limit(1)
-
-        with self._session_factory() as session:
-            existing_uuid = session.execute(check_existing_stmt).scalars().first()
-
-        cluster_uuid = existing_uuid or uuid4()
-
-        # NOTE: Only works on Postgres.
-        stmt = pg_insert(self._table).values([
-            {
-                "band_idx": i,
-                "band_hash": h,
-                "cluster_uuid": cluster_uuid,
-            }
-            for i, h in bands
-        ]).on_conflict_do_nothing(
-            index_elements=["band_idx", "band_hash"]
+        check_existing_stmt = (
+            select(self._table.c.cluster_uuid)
+            .where(tuple_(self._table.c.band_idx, self._table.c.band_hash).in_(bands))
+            .limit(1)
         )
 
         with self._session_factory() as session:
-            session.execute(stmt)
+            existing_uuid = session.execute(check_existing_stmt).scalars().first()
+            cluster_uuid = existing_uuid or uuid4()
+
+            # NOTE: Only works on Postgres.
+            stmt = (
+                pg_insert(self._table).values([
+                    {"band_idx": i, "band_hash": h, "cluster_uuid": cluster_uuid}
+                    for i, h in bands
+                ])
+                .on_conflict_do_nothing(index_elements=["band_idx", "band_hash"])
+            )
+
+            _ = session.execute(stmt)
             session.commit()
 
         return cluster_uuid
