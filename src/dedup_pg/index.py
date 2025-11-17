@@ -1,14 +1,9 @@
 import hashlib
-import struct
 import numpy as np
-import xxhash
 from collections.abc import Iterable
 from uuid import UUID
 
 from .backend import Backend, LocalBackend
-
-MAX64 = np.uint64((1 << 64) - 1)
-MIX_CONST = np.uint64(0x9e3779b97f4a7c15)
 
 
 class DedupIndex:
@@ -16,7 +11,7 @@ class DedupIndex:
         self,
         backend: Backend | None = None,
         num_perms: int = 128,
-        rows: int = 4,
+        rows: int = 5,
     ) -> None:
         """
         Indexing layer that allows for query-time deduplication through hashing.
@@ -42,17 +37,12 @@ class DedupIndex:
         Returns:
             list[int]: An array of integer has hash values, one per seed.
         """
-        base = token.encode()
-        hashes = np.empty(len(seeds), dtype=np.uint64)
+        return np.array([
+            int(hashlib.blake2b(f"{token}-{seed}".encode(), digest_size=8).hexdigest(), 16)
+            for seed in seeds
+        ])
 
-        for i, seed in enumerate(seeds):
-            # Concatenate without formatting overhead
-            payload = base + b"-" + str(int(seed)).encode()
-            hashes[i] = xxhash.xxh3_64(payload).intdigest()
-
-        return hashes
-
-    def _minhash_signature(self, tokens: Iterable[str]) -> np.ndarray:
+    def _minhash_signature(self, tokens: Iterable[str]) -> list[int]:
         """
         Optimized MinHash calculation using numpy vectorization.
 
@@ -63,18 +53,16 @@ class DedupIndex:
             list[int]: A MinHash signature consisting of `num_rows` hashes.
         """
         tokens = list(tokens)
-        seeds = np.arange(self.num_hashes, dtype=np.uint64)
-        perm = seeds * MIX_CONST
-        min_hashes = np.full(self.num_hashes, MAX64, dtype=np.uint64)
+        seeds = np.arange(self.num_hashes)
+        min_hashes = np.full(self.num_hashes, np.inf)
 
         for token in tokens:
-            h0 = np.uint64(xxhash.xxh3_64(token).intdigest())
-            token_hashes = h0 ^ perm
+            token_hashes = self._token_hash(token, seeds)
             min_hashes = np.minimum(min_hashes, token_hashes)
 
-        return min_hashes
+        return min_hashes.astype(int).tolist()
 
-    def bands(self, tokens: Iterable[str]) -> list[int]:
+    def bands(self, tokens: Iterable[str]) -> list[str]:
         """
         Returns LSH bands. Currently, this only supports MinHash, which is the most popular algorithm for deduplicating
         large-scale data.
@@ -87,17 +75,18 @@ class DedupIndex:
             list[str]: LSH bands derived from the MinHash signature of the tokens.
         """
         signature = self._minhash_signature(tokens)
-        band_hashes: list[int] = []
+        band_hashes: list[str] = []
 
         for i in range(0, len(signature), self.rows):
             band = signature[i:i + self.rows]
-            payload = struct.pack(f"{len(band)}Q", *band)
-            band_hash = np.uint64(xxhash.xxh64(payload).intdigest()).view(np.int64)
-            band_hashes.append(int(band_hash))
+            band_str = '|'.join(map(str, band))
+            band_hash = hashlib.blake2b(band_str.encode(), digest_size=8).hexdigest()
+
+            band_hashes.append(band_hash)
 
         return band_hashes
 
-    def items(self, bands: Iterable[int]) -> list[tuple[int, int]]:
+    def items(self, bands: Iterable[str]) -> list[tuple[int, str]]:
         """
         A helper function which converts a list of bands to a normalized (index, band) format. Useful for inserting rows
         into a database.
@@ -111,7 +100,7 @@ class DedupIndex:
         """
         return [(idx, bh) for idx, bh in enumerate(bands)]
 
-    def index(self, items: Iterable[tuple[int, int]]) -> UUID:
+    def index(self, items: Iterable[tuple[int, str]]) -> UUID:
         """
         Retrieves the cluster UUID4 of a given items list derived from MinHash bands. This may add a new entry to the
         backend if the bands do not exist.

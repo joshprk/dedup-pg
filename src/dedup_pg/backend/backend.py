@@ -5,11 +5,11 @@ from uuid import UUID, uuid4
 
 class Backend(ABC):
     @abstractmethod
-    def insert(self, bands: Iterable[tuple[int, int]]) -> UUID:
+    def insert(self, bands: Iterable[tuple[int, str]]) -> UUID:
         pass
 
     @abstractmethod
-    def query(self, index: int, band: int) -> UUID | None:
+    def query(self, index: int, band: str) -> UUID | None:
         pass
 
 
@@ -18,9 +18,9 @@ class LocalBackend(Backend):
         """
         A local backend as an example of how to implement the Backend class.
         """
-        self._index: dict[tuple[int, int], UUID] = {}
+        self._index: dict[tuple[int, str], UUID] = {}
 
-    def insert(self, bands: Iterable[tuple[int, int]]) -> UUID:
+    def insert(self, bands: Iterable[tuple[int, str]]) -> UUID:
         found_uuid = None
 
         for index, band in bands:
@@ -35,7 +35,7 @@ class LocalBackend(Backend):
 
         return found_uuid
 
-    def query(self, index: int, band: int) -> UUID | None:
+    def query(self, index: int, band: str) -> UUID | None:
         item = (index, band)
 
         if item in self._index:
