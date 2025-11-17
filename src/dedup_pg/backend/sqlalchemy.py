@@ -7,7 +7,6 @@ from sqlalchemy import (
     Engine,
     MetaData,
     SmallInteger,
-    String,
     Table,
     UniqueConstraint,
     Uuid,
@@ -25,8 +24,7 @@ class SQLAlchemyBackend(Backend):
     def __init__(
         self,
         *,
-        engine: Engine | None = None,
-        session_factory: sessionmaker[Session] | None = None,
+        engine: Engine,
         base_or_metadata: type[DeclarativeBase] | MetaData,
         table_name: str,
     ) -> None:
@@ -47,13 +45,7 @@ class SQLAlchemyBackend(Backend):
         else:
             raise TypeError("Expected SQLAlchemy DeclarativeBase, registry, or MetaData object")
 
-        if engine is None and session_factory is None:
-            raise ValueError("Must provide either engine or session_factory")
-
-        if session_factory is None:
-            session_factory = sessionmaker(engine)
-
-        self._session_factory = session_factory
+        self._engine = engine
         self._metadata = metadata
         self._table = Table(
             table_name,
@@ -84,16 +76,16 @@ class SQLAlchemyBackend(Backend):
             .limit(1)
         )
 
-        with self._session_factory() as session:
+        with self._engine.begin() as conn:
             # Commit returns before WAL is flushed to durable storage.
             # The transaction is visible immediately, but a crash before a WAL flush may
             # forget some committed transactions.
             #
             # This is a good-tradeoff as it saves nearly 5 ms of commit time for a high-volume
             # transaction in exchange for long-tail errors.
-            _ = session.execute(text("SET LOCAL synchronous_commit = OFF"))
+            _ = conn.execute(text("SET LOCAL synchronous_commit = OFF"))
 
-            existing_uuid = session.execute(check_existing_stmt).scalars().first()
+            existing_uuid = conn.execute(check_existing_stmt).scalars().first()
             cluster_uuid = existing_uuid or uuid4()
 
             # NOTE: Only works on Postgres.
@@ -102,8 +94,8 @@ class SQLAlchemyBackend(Backend):
                 for i, h in bands
             ]
 
-            _ = session.execute(self._insert_sql, values)
-            session.commit()
+            _ = conn.execute(self._insert_sql, values)
+            conn.commit()
 
         return cluster_uuid
 
@@ -113,7 +105,7 @@ class SQLAlchemyBackend(Backend):
             self._table.c.band_hash == band,
         ).limit(1)
 
-        with self._session_factory() as session:
-            result = session.execute(stmt).scalars().first()
+        with self._engine.begin() as conn:
+            result = conn.execute(stmt).scalars().first()
 
         return result
