@@ -19,4 +19,7 @@ sqlalchemy = [
 [dependency-groups]
 dev = [
     "docker>=7.1.0",
+    "pgvector>=0.4.1",
+    "rich>=14.2.0",
+    "typer>=0.20.0",
 ]
