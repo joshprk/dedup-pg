@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BIGINT,
     Column,
     Engine,
     MetaData,
@@ -58,7 +59,7 @@ class SQLAlchemyBackend(Backend):
             table_name,
             self._metadata,
             Column("band_idx", SmallInteger, nullable=False),
-            Column("band_hash", String, nullable=False),
+            Column("band_hash", BIGINT, nullable=False),
             Column("cluster_uuid", Uuid, nullable=False),
         )
 
@@ -76,7 +77,7 @@ class SQLAlchemyBackend(Backend):
             .on_conflict_do_nothing(index_elements=["band_idx", "band_hash"])
         )
 
-    def insert(self, bands: Iterable[tuple[int, str]]) -> UUID:
+    def insert(self, bands: Iterable[tuple[int, int]]) -> UUID:
         check_existing_stmt = (
             select(self._table.c.cluster_uuid)
             .where(tuple_(self._table.c.band_idx, self._table.c.band_hash).in_(bands))
@@ -106,7 +107,7 @@ class SQLAlchemyBackend(Backend):
 
         return cluster_uuid
 
-    def query(self, index: int, band: str) -> UUID | None:
+    def query(self, index: int, band: int) -> UUID | None:
         stmt = select(self._table.c.cluster_uuid).where(
             self._table.c.band_idx == index,
             self._table.c.band_hash == band,
