@@ -2,7 +2,7 @@ from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    BigInteger,
+    BIGINT,
     Column,
     Engine,
     MetaData,
@@ -12,6 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     select,
+    text,
     tuple_
 )
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -57,10 +58,9 @@ class SQLAlchemyBackend(Backend):
         self._table = Table(
             table_name,
             self._metadata,
-            Column("id", BigInteger, primary_key=True, autoincrement=True),
             Column("band_idx", SmallInteger, nullable=False),
-            Column("band_hash", String, nullable=False),
-            Column("cluster_uuid", Uuid, default=uuid4, nullable=False, index=True),
+            Column("band_hash", BIGINT, nullable=False),
+            Column("cluster_uuid", Uuid, nullable=False),
         )
 
         self._table.append_constraint(
@@ -71,35 +71,43 @@ class SQLAlchemyBackend(Backend):
             )
         )
 
-    def insert(self, bands: Iterable[tuple[int, str]]) -> UUID:
-        check_existing_stmt = select(self._table.c.cluster_uuid).where(
-            tuple_(self._table.c.band_idx, self._table.c.band_hash).in_(bands)
-        ).limit(1)
+        # Precompile PostgreSQL insert stmt
+        self._insert_sql = (
+            pg_insert(self._table)
+            .on_conflict_do_nothing(index_elements=["band_idx", "band_hash"])
+        )
 
-        with self._session_factory() as session:
-            existing_uuid = session.execute(check_existing_stmt).scalars().first()
-
-        cluster_uuid = existing_uuid or uuid4()
-
-        # NOTE: Only works on Postgres.
-        stmt = pg_insert(self._table).values([
-            {
-                "band_idx": i,
-                "band_hash": h,
-                "cluster_uuid": cluster_uuid,
-            }
-            for i, h in bands
-        ]).on_conflict_do_nothing(
-            index_elements=["band_idx", "band_hash"]
+    def insert(self, bands: Iterable[tuple[int, int]]) -> UUID:
+        check_existing_stmt = (
+            select(self._table.c.cluster_uuid)
+            .where(tuple_(self._table.c.band_idx, self._table.c.band_hash).in_(bands))
+            .limit(1)
         )
 
         with self._session_factory() as session:
-            session.execute(stmt)
+            # Commit returns before WAL is flushed to durable storage.
+            # The transaction is visible immediately, but a crash before a WAL flush may
+            # forget some committed transactions.
+            #
+            # This is a good-tradeoff as it saves nearly 5 ms of commit time for a high-volume
+            # transaction in exchange for long-tail errors.
+            _ = session.execute(text("SET LOCAL synchronous_commit = OFF"))
+
+            existing_uuid = session.execute(check_existing_stmt).scalars().first()
+            cluster_uuid = existing_uuid or uuid4()
+
+            # NOTE: Only works on Postgres.
+            values = [
+                {"band_idx": i, "band_hash": h, "cluster_uuid": str(cluster_uuid)}
+                for i, h in bands
+            ]
+
+            _ = session.execute(self._insert_sql, values)
             session.commit()
 
         return cluster_uuid
 
-    def query(self, index: int, band: str) -> UUID | None:
+    def query(self, index: int, band: int) -> UUID | None:
         stmt = select(self._table.c.cluster_uuid).where(
             self._table.c.band_idx == index,
             self._table.c.band_hash == band,

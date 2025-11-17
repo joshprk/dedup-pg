@@ -1,19 +1,20 @@
 from collections import defaultdict
 
 from dedup_pg import DedupIndex
+from dedup_pg.backend import Backend
 from dedup_pg.helpers import n_grams
 
 
-def func() -> dict[str, list[str]]:
+def readme_func(backend: Backend | None = None) -> dict[str, list[str]]:
     # A corpus of named items we want to deduplicate
     corpus = [
         ("key1", "The quick brown fox jumps over the lazy dog"),
-        ("key2", "T e qui k bnown fox jump  over t e  azy  og"),
+        ("key2", " he quic  bnown f x jump  over the  azy dog"),
         ("key3", "An entirely different sentence!"),
     ]
 
     # Our deduplication index - this can be Postgres-backed with configuration
-    lsh = DedupIndex()
+    lsh = DedupIndex(backend)
 
     # Using n=3 character n-grams is a strong choice for deduplicating textual chunks
     n_gram_corpus = [(key, n_grams(text, n=3)) for key, text in corpus]
@@ -32,7 +33,7 @@ def func() -> dict[str, list[str]]:
 
 
 def test_readme():
-    result = list(func().values())
+    result = list(readme_func().values())
 
     assert "key1" in result[0] and "key2" in result[0]
     assert "key3" in result[1]
