@@ -1,5 +1,5 @@
 {
-  description = "Postgres indexing utilities to implement high-throughput queries with on-the-fly deduplication";
+  description = "Postgres indexing utilities to implement query-time deduplication.";
 
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
