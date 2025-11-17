@@ -86,7 +86,7 @@ def test_postgres_sequential_insert(postgres_server: dict[str, str]) -> None:
         _ = session.execute(text("ANALYZE seq_lsh_index"))
         session.commit()
 
-    for i in range(500):
+    for i in range(5000):
         rand_str = n_grams("".join([random.choice(string.ascii_letters) for _ in range(15)]))
         t = timeit.timeit(
             lambda s=rand_str: index.query(s),
@@ -106,15 +106,16 @@ def test_postgres_profile_insert(postgres_server: dict[str, str]) -> None:
         SQLAlchemyBackend(
             engine=engine,
             base_or_metadata=Base,
-            table_name="seq_lsh_index",
+            table_name="profile_lsh_index",
         )
     )
 
     Base.metadata.create_all(engine)
 
-    def profile_insert(index: DedupIndex, bands):
+    def profile_insert(index: DedupIndex, bands: list[str], iters: int = 500):
         def target():
-            index.query(bands)
+            for _ in range(iters):
+                index.query(bands)
 
         with cProfile.Profile() as pr:
             target()
@@ -144,13 +145,12 @@ def test_postgres_explain_insert(postgres_server: dict[str, str]) -> None:
     # Generate a representative band set
     tokens = [f"token-{i}" for i in range(32)]
     bands = index.bands(tokens)
-    items = index.items(bands)
 
     # Build the exact INSERT statement that backend.insert(items) will execute.
     # We reconstruct it so we can EXPLAIN it directly.
     values_clause = ", ".join(
         f"({band_index}, '{band_hash}', gen_random_uuid())"
-        for band_index, band_hash in items
+        for band_index, band_hash in enumerate(bands) 
     )
 
     explain_sql = f"""

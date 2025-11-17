@@ -23,8 +23,7 @@ def readme_func(backend: Backend | None = None) -> dict[str, list[str]]:
     duplicate_map = defaultdict(list)
     for key, n_gram in n_gram_corpus:
         bands = lsh.bands(n_gram)
-        lsh_items = lsh.items(bands)
-        cluster_key = lsh.index(lsh_items)
+        cluster_key = lsh.index(bands)
 
         duplicate_map[cluster_key].append(key)
 

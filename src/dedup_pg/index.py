@@ -7,8 +7,8 @@ from uuid import UUID
 
 from .backend import Backend, LocalBackend
 
-MAX64 = np.uint64((1 << 64) - 1)
-MIX_CONST = np.uint64(0x9e3779b97f4a7c15)
+MAX64 = np.uint64((1 << 64) - 1) # max uint64 mask
+MIX_CONST = np.uint64(0x9e3779b97f4a7c15) # golden ratio
 
 
 class DedupIndex:
@@ -30,6 +30,7 @@ class DedupIndex:
         self.num_bands = num_perms // rows
 
         self._backend = LocalBackend() if backend is None else backend
+        self._backend._init_internal(self.num_bands) # pyright: ignore[reportPrivateUsage]
 
     def _token_hash(self, token: str, seeds: np.ndarray) -> np.ndarray:
         """
@@ -46,7 +47,6 @@ class DedupIndex:
         hashes = np.empty(len(seeds), dtype=np.uint64)
 
         for i, seed in enumerate(seeds):
-            # Concatenate without formatting overhead
             payload = base + b"-" + str(int(seed)).encode()
             hashes[i] = xxhash.xxh3_64(payload).intdigest()
 
@@ -97,21 +97,7 @@ class DedupIndex:
 
         return band_hashes
 
-    def items(self, bands: Iterable[int]) -> list[tuple[int, int]]:
-        """
-        A helper function which converts a list of bands to a normalized (index, band) format. Useful for inserting rows
-        into a database.
-
-        Args:
-            bands (Iterable[str]): An iterable of LSH bands
-
-        Returns:
-            list[tuple[int, str]]: A list of tuples containing the index of the band hash, and then the band hash
-                itself. Note that the band hash can be represented as a BIGINT
-        """
-        return [(idx, bh) for idx, bh in enumerate(bands)]
-
-    def index(self, items: Iterable[tuple[int, int]]) -> UUID:
+    def index(self, items: Iterable[int]) -> UUID:
         """
         Retrieves the cluster UUID4 of a given items list derived from MinHash bands. This may add a new entry to the
         backend if the bands do not exist.
@@ -136,5 +122,4 @@ class DedupIndex:
             UUID: The cluster ID of the given tokens.
         """
         bands = self.bands(tokens)
-        items = self.items(bands)
-        return self.index(items)
+        return self.index(bands)
