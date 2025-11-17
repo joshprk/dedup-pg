@@ -46,7 +46,7 @@ def _summarize(name, values):
     print(f"  ops/sec: {rate:.2f}")
 
 
-def test_postgres(postgres_server: dict[str, str]) -> None:
+def test_postgres_simple(postgres_server: dict[str, str]) -> None:
     database_url = _fmt_database_url(postgres_server)
     engine = create_engine(database_url)
     backend = SQLAlchemyBackend(
@@ -57,6 +57,8 @@ def test_postgres(postgres_server: dict[str, str]) -> None:
 
     Base.metadata.create_all(engine)
     result = list(readme_func(backend).values())
+    
+    print(result)
 
     assert "key1" in result[0] and "key2" in result[0]
     assert "key3" in result[1]
