@@ -16,8 +16,8 @@
         currentPython = pkgs.python311;
       in {
         packages.dedup-pg = currentPython.buildPythonPackage {
-          pname = "lsh-postgres";
-          version = "0.1.0";
+          pname = "dedup-pg";
+          version = "0.3.0";
 
           src = ./.;
 
