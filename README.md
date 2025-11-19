@@ -32,7 +32,7 @@ from dedup_pg.helpers import n_grams
 # A corpus of named items we want to deduplicate
 corpus = [
     ("key1", "The quick brown fox jumps over the lazy dog"),
-    ("key2", "T e qui k bnown fox jump  over t e  azy  og"),
+    ("key2", " he quic  bnown f x jump  over the  azy dog"),
     ("key3", "An entirely different sentence!"),
 ]
 
