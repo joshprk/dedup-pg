@@ -45,10 +45,7 @@ n_gram_corpus = [(key, n_grams(text, n=3)) for key, text in corpus]
 # Index bands for each key which help us determine duplicates
 duplicate_map = defaultdict(list)
 for key, n_gram in n_gram_corpus:
-    bands = lsh.bands(n_gram)
-    lsh_items = lsh.items(bands)
-    cluster_key = lsh.index(lsh_items)
-
+    cluster_key = lsh.query(n_gram)
     duplicate_map[cluster_key].append(key)
 
 # `key1` and `key2` are in the same cluster in contrast to `key3`
