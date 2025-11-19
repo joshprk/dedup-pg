@@ -27,7 +27,6 @@ class SQLAlchemyBackend(Backend):
         engine: Engine,
         base_or_metadata: type[DeclarativeBase] | MetaData,
         table_name: str,
-        num_bands: int | None = 32,
     ) -> None:
         """
         The SQLAlchemy backend for the deduplication indexing layer.
