@@ -17,7 +17,7 @@
       in {
         packages.dedup-pg = currentPython.buildPythonPackage {
           pname = "dedup-pg";
-          version = "0.4.1";
+          version = "0.4.2";
 
           src = ./.;
 
