@@ -49,7 +49,6 @@ class SQLAlchemyBackend(Backend):
 
         self._engine = engine
         self._metadata = metadata
-        self._num_bands = num_bands
         self._table = Table(
             table_name,
             self._metadata,
