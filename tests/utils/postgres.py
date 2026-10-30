@@ -1,8 +1,10 @@
 from collections.abc import Iterator
+import os
 import time
 
 import docker
 import pytest
+from sqlalchemy.engine import make_url
 
 PGVECTOR_IMAGE_NAME = "pgvector/pgvector:pg18-trixie"
 
@@ -12,6 +14,17 @@ def postgres_server() -> Iterator[dict[str, str]]:
     """
     Start a Postgres database with `pgvector` installed
     """
+    if database_url := os.environ.get("DEDUP_PG_TEST_DATABASE_URL"):
+        url = make_url(database_url)
+        yield {
+            "host": url.host or "localhost",
+            "port": str(url.port or 5432),
+            "database": url.database or "testdb",
+            "user": url.username or "postgres",
+            "password": url.password or "",
+        }
+        return
+
     client = docker.from_env()
     _image = client.images.pull(PGVECTOR_IMAGE_NAME)
 
