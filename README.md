@@ -55,6 +55,37 @@ print(duplicate_map)
 For ease-of-use, we provide the `dedup_pg.backend.sqlalchemy.SQLAlchemy` backend, which you use by
 passing it the the `DedupIndex` initialization.
 
+### PostgreSQL concurrency
+
+Concurrent SQLAlchemy inserts that share a `(band_idx, band_hash)` key acquire
+transaction-scoped advisory locks in a consistent order. The lookup then runs in a
+separate READ COMMITTED statement, so it sees the preceding writer's commit.
+The backend uses READ COMMITTED for its own insert transactions even if the engine
+has a different default isolation level. Disjoint band sets can still proceed concurrently;
+advisory-lock hash collisions can cause extra waiting but cannot change band matches.
+This adds one database round trip per insert.
+
+If an input matches multiple existing clusters, the lowest matching band index wins.
+Existing clusters are not merged or reassigned; previously returned UUIDs remain unchanged.
+New bands are stored under the selected UUID, as before. The existing
+`synchronous_commit = OFF` durability tradeoff is unchanged.
+
+No schema migration is required. For rollout, stop/drain old writers before enabling
+new ones: all writers to an index must use this locking protocol. Mixed-version or
+direct SQL writers can still race. This fix does not repair UUIDs already returned
+by the old race.
+
+### Running tests
+
+```sh
+uv sync --all-extras
+PYTHONPATH=src uv run pytest tests/readme.py tests/postgres.py tests/test_postgres_concurrency.py
+```
+
+By default the PostgreSQL fixture starts a PostgreSQL 18 Docker container. To use an
+existing **disposable test database**, set `DEDUP_PG_TEST_DATABASE_URL` to its SQLAlchemy
+PostgreSQL URL. Tests create and drop tables; never point them at production.
+
 ## Alternatives
 
 This library is the easiest way to implement deduplication in Postgres, and has been successfully
